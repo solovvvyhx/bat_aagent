@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class Settings(BaseSettings):
+    """Конфигурация приложения из переменных окружения и .env."""
+
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    bot_token: str
+    admin_id: int = 5267340908
+
+    mes_login: str
+    mes_password: str
+    mes_base_url: str = "https://edu.mes.ru"
+
+    timezone: str = "Europe/Moscow"
+    morning_time: str = "07:30"
+    evening_offset_minutes: int = 20
+
+    port: int = 8080
+
+    # Задел под Этап 4 (мульти-юзер)
+    encryption_key: str = ""
+    database_url: str = "sqlite:///bat.db"
+
+    @property
+    def tz(self) -> ZoneInfo:
+        """Возвращает объект часового пояса."""
+        return ZoneInfo(self.timezone)
+
+    @property
+    def avatar_path(self) -> Path:
+        """Путь к файлу аватарки бота."""
+        return BASE_DIR / "assets" / "avatar.jpg"
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Возвращает синглтон настроек приложения."""
+    return Settings()

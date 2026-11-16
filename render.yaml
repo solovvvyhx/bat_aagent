@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: bat-assistant
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        value: "5267340908"
+      - key: MES_LOGIN
+        sync: false
+      - key: MES_PASSWORD
+        sync: false
+      - key: MES_BASE_URL
+        value: https://edu.mes.ru
+      - key: TIMEZONE
+        value: Europe/Moscow
+      - key: MORNING_TIME
+        value: "07:30"
+      - key: EVENING_OFFSET_MINUTES
+        value: "20"
