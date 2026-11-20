@@ -7,6 +7,7 @@ import sys
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from src.config import get_settings
 from src.handlers import get_main_router
@@ -50,6 +51,17 @@ async def run() -> None:
     scheduler.start()
 
     try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="morning", description="🌅 Сводка на сегодня (расписание, работы, ДЗ)"),
+                BotCommand(command="tomorrow", description="📆 Сводка на завтра"),
+                BotCommand(command="evening", description="🌙 Вечерняя сводка (оценки за сегодня + ДЗ)"),
+                BotCommand(command="works", description="📝 Ближайшие контрольные и работы (14 дн.)"),
+                BotCommand(command="grades", description="🎯 Текущие оценки и средний балл"),
+                BotCommand(command="avatar", description="🦇 Аватарка Bat"),
+                BotCommand(command="start", description="ℹ️ О боте и список команд"),
+            ]
+        )
         await bot.delete_webhook(drop_pending_updates=True)
         await dp.start_polling(bot)
     finally:
