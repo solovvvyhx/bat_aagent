@@ -4,16 +4,18 @@ import asyncio
 import json
 import logging
 import re
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from typing import Any, Optional
 
 import httpx
 from bs4 import BeautifulSoup
 
-from src.models import Attachment, DaySchedule, HomeworkItem, Lesson
+from src.models import Attachment, DaySchedule, GradeItem, HomeworkItem, Lesson, SubjectGrades, WorkItem
 
 
 logger = logging.getLogger(__name__)
+
+_MSK_TZ = timezone(timedelta(hours=3))
 
 _WEEKDAY_TO_INDEX = {
     "понедельник": 0,
@@ -27,7 +29,9 @@ _WEEKDAY_TO_INDEX = {
 
 _TIME_PAIR_RE = re.compile(r"(\d{1,2})[:](\d{2})\s*[-–]\s*(\d{1,2})[:](\d{2})")
 _ROOM_RE = re.compile(r"\bауд\.\s*([^\s,]+)\s*(.*)$", re.IGNORECASE)
-_GROUP_TAG_RE = re.compile(r"\s*\((?:гр\.|проф|баз)[^)]*\)", re.IGNORECASE)
+_GROUP_TAG_RE = re.compile(r"\s*\((?:гр\.|проф|баз|SL|HL)[^)]*\)", re.IGNORECASE)
+_WORK_DESC_RE = re.compile(r"^(Summative|Formative)\s*:\s*(.+?)(?:\s*\(\d{1,2}\s+\S+\s+\d{4}\))?$", re.IGNORECASE)
+_GANTT_DATE_RE = re.compile(r"Date\((\d+)\)")
 
 
 class MesAuthError(RuntimeError):
@@ -134,6 +138,45 @@ class MesClient:
         schedule = self._parse_schedule(schedule_resp.text, target_date)
         homeworks = await self._parse_hometasks(hometasks_resp.text, target_date)
         return schedule, homeworks
+
+    async def fetch_morning_data(
+        self, target_date: date
+    ) -> tuple[DaySchedule, list[HomeworkItem], list[WorkItem]]:
+        """Параллельно загружает расписание, ДЗ и календарь работ на указанную дату."""
+        await self.ensure_authenticated()
+        schedule_resp, hometasks_resp, works_resp = await asyncio.gather(
+            self._get_authenticated("/psychologistmentor/schedules/student"),
+            self._get_authenticated("/psychologistmentor/schedules/hometasks"),
+            self._get_authenticated("/psychologistmentor/schedules/calendar-final-current-works"),
+        )
+
+        schedule = self._parse_schedule(schedule_resp.text, target_date)
+        homeworks = await self._parse_hometasks(hometasks_resp.text, target_date)
+        works = self._parse_works(works_resp.text, from_date=target_date, to_date=target_date)
+        return schedule, homeworks, works
+
+    async def fetch_works(self, from_date: date, days: int = 14) -> list[WorkItem]:
+        """Загружает текущие и итоговые работы на период [from_date, from_date + days]."""
+        resp = await self._get_authenticated(
+            "/psychologistmentor/schedules/calendar-final-current-works"
+        )
+        to_date = from_date + timedelta(days=days)
+        return self._parse_works(resp.text, from_date=from_date, to_date=to_date)
+
+    async def fetch_grades(self) -> list[SubjectGrades]:
+        """Загружает все текущие оценки по предметам со страницы успешности."""
+        resp = await self._get_authenticated("/psychologistmentor/default/student-success")
+        return self._parse_grades(resp.text)
+
+    async def fetch_grades_for_date(self, target_date: date) -> list[GradeItem]:
+        """Возвращает все оценки, выставленные за конкретную дату."""
+        subjects = await self.fetch_grades()
+        result: list[GradeItem] = []
+        for subj in subjects:
+            for g in subj.grades:
+                if g.grade_date == target_date:
+                    result.append(g)
+        return result
 
     async def fetch_schedule(self, target_date: date) -> DaySchedule:
         """Загружает только расписание на указанную дату."""
@@ -365,3 +408,135 @@ class MesClient:
         lines = [line.strip() for line in clean.splitlines()]
         compacted = "\n".join(lines)
         return re.sub(r"\n{3,}", "\n\n", compacted).strip()
+
+    @staticmethod
+    def _normalize_subject(raw_name: str) -> str:
+        """Очищает название предмета от (SL), (HL), (проф), (гр. ...) и длинных уточнений."""
+        name = _GROUP_TAG_RE.sub("", raw_name).strip()
+        if name.startswith("Математика ("):
+            name = "Математика"
+        return re.sub(r"\s+", " ", name).strip()
+
+    @staticmethod
+    def _extract_js_json_array(html: str, marker: str) -> Optional[list[Any]]:
+        """Надёжно извлекает JSON-массив, следующий сразу за marker в JS-коде."""
+        idx = html.find(marker)
+        if idx == -1:
+            return None
+        start = html.find("[", idx)
+        if start == -1:
+            return None
+        try:
+            data, _ = json.JSONDecoder().raw_decode(html, start)
+            return data if isinstance(data, list) else None
+        except json.JSONDecodeError:
+            logger.warning("Не удалось распарсить JSON после %s", marker)
+            return None
+
+    def _parse_works(self, html: str, from_date: date, to_date: date) -> list[WorkItem]:
+        """Парсит календарь итоговых и текущих работ."""
+        raw_events = self._extract_js_json_array(html, "var dataResult =")
+        if not raw_events:
+            return []
+
+        works: list[WorkItem] = []
+        for ev in raw_events:
+            start_str = (ev.get("start") or "").strip()
+            if not start_str:
+                continue
+            try:
+                work_date = datetime.strptime(start_str[:10], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+
+            if not (from_date <= work_date <= to_date):
+                continue
+
+            title = re.sub(r"\s+", " ", str(ev.get("title") or "")).strip()
+            desc = str((ev.get("extendedProps") or {}).get("description") or "").strip()
+
+            kind = "Formative"
+            subject = "Предмет"
+            m = _WORK_DESC_RE.match(desc)
+            if m:
+                kind = m.group(1).capitalize()
+                subject = self._normalize_subject(m.group(2))
+            elif desc:
+                subject = self._normalize_subject(desc)
+
+            works.append(
+                WorkItem(
+                    subject=subject,
+                    title=title or "Работа",
+                    work_date=work_date,
+                    kind=kind,
+                )
+            )
+
+        works.sort(key=lambda w: (w.work_date, 0 if w.kind == "Summative" else 1, w.subject))
+        return works
+
+    def _parse_grades(self, html: str) -> list[SubjectGrades]:
+        """Парсит оценки из gantt-диаграммы на странице успешности студента."""
+        raw_subjects = self._extract_js_json_array(html, "source: [")
+        if not raw_subjects:
+            return []
+
+        subjects: list[SubjectGrades] = []
+        for entry in raw_subjects:
+            raw_name = str(entry.get("name") or "").strip()
+            if not raw_name:
+                continue
+            subject_name = self._normalize_subject(raw_name)
+            grades: list[GradeItem] = []
+
+            for val in entry.get("values") or []:
+                label = val.get("label")
+                if label is None or label == "" or label == "-":
+                    continue
+                try:
+                    grade_value = int(label)
+                except (TypeError, ValueError):
+                    continue
+
+                from_str = str(val.get("from") or "")
+                dm = _GANTT_DATE_RE.search(from_str)
+                if not dm:
+                    continue
+                ms = int(dm.group(1))
+                grade_date = datetime.fromtimestamp(ms / 1000.0, tz=_MSK_TZ).date()
+
+                custom_class = str(val.get("customClass") or "")
+                kind = "Summative" if "Red" in custom_class else "Formative"
+
+                title, work_type = self._parse_grade_desc(str(val.get("desc") or ""))
+                grades.append(
+                    GradeItem(
+                        subject=subject_name,
+                        value=grade_value,
+                        grade_date=grade_date,
+                        kind=kind,
+                        title=title,
+                        work_type=work_type,
+                    )
+                )
+
+            grades.sort(key=lambda g: g.grade_date)
+            subjects.append(SubjectGrades(subject=subject_name, grades=grades))
+
+        subjects.sort(key=lambda s: s.subject.lower())
+        return subjects
+
+    @staticmethod
+    def _parse_grade_desc(raw_desc: str) -> tuple[Optional[str], Optional[str]]:
+        """Извлекает тему и тип работы из HTML-подсказки оценки."""
+        if not raw_desc:
+            return None, None
+        soup = BeautifulSoup(raw_desc, "lxml")
+        bold = soup.find("b")
+        span = soup.find("span")
+        title = re.sub(r"\s+", " ", bold.get_text(" ", strip=True)).strip() if bold else None
+        work_type = re.sub(r"\s+", " ", span.get_text(" ", strip=True)).strip() if span else None
+        if title and title.lower().startswith("оценка:"):
+            title = None
+        return title or None, work_type or None

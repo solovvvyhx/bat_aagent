@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
@@ -51,15 +52,15 @@ class BatScheduler:
             self._scheduler.shutdown(wait=False)
 
     async def send_morning_digest(self) -> None:
-        """Отправляет утреннюю сводку и планирует вечернюю на сегодня."""
+        """Отправляет утреннюю сводку (расписание + работы + ДЗ) и планирует вечернюю."""
         today = datetime.now(self._settings.tz).date()
         try:
-            schedule, homeworks = await self._mes.fetch_day_data(today)
+            schedule, homeworks, works = await self._mes.fetch_morning_data(today)
             if not schedule.lessons:
                 logger.info("Сегодня (%s) уроков нет, утренняя сводка пропущена.", today)
                 return
 
-            text = format_morning_digest(schedule, homeworks)
+            text = format_morning_digest(schedule, homeworks, works=works)
             await self._send_long_message(text)
             await self._schedule_evening_for_day(schedule.target_date, schedule.last_lesson_end)
         except Exception:
@@ -95,12 +96,20 @@ class BatScheduler:
         logger.info("Вечерняя сводка запланирована на %s", run_at.strftime("%Y-%m-%d %H:%M"))
 
     async def send_evening_digest(self) -> None:
-        """Отправляет вечернюю сводку (ДЗ на завтра / ближайший учебный день)."""
+        """Отправляет вечернюю сводку: новые оценки за сегодня + ДЗ на следующий учебный день."""
         today = datetime.now(self._settings.tz).date()
         try:
             target = await self.find_next_school_date(today)
-            homeworks = await self._mes.fetch_hometasks(target)
-            text = format_evening_digest(today, homeworks, next_school_date=target)
+            homeworks, today_grades = await asyncio.gather(
+                self._mes.fetch_hometasks(target),
+                self._mes.fetch_grades_for_date(today),
+            )
+            text = format_evening_digest(
+                today,
+                homeworks,
+                next_school_date=target,
+                today_grades=today_grades,
+            )
             await self._send_long_message(text)
         except Exception:
             logger.exception("Ошибка при отправке вечерней сводки")

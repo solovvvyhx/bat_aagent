@@ -67,3 +67,41 @@ class DaySchedule:
         if not self.lessons:
             return None
         return max(lesson.end_time for lesson in self.lessons)
+
+
+@dataclass
+class WorkItem:
+    """Текущая или итоговая работа из календаря работ."""
+
+    subject: str
+    title: str
+    work_date: date
+    kind: str = "Formative"  # "Summative" | "Formative" | "Other"
+
+
+@dataclass
+class GradeItem:
+    """Оценка по предмету за конкретную дату."""
+
+    subject: str
+    value: int
+    grade_date: date
+    kind: str = "Formative"  # "Summative" | "Formative"
+    title: Optional[str] = None
+    work_type: Optional[str] = None
+
+
+@dataclass
+class SubjectGrades:
+    """Сводка оценок по одному предмету."""
+
+    subject: str
+    grades: list[GradeItem] = field(default_factory=list)
+
+    @property
+    def average(self) -> Optional[float]:
+        """Средний балл по предмету."""
+        if not self.grades:
+            return None
+        return sum(g.value for g in self.grades) / len(self.grades)
+
