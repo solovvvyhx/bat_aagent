@@ -21,7 +21,7 @@ async def cmd_start(message: Message) -> None:
         "• /tomorrow — сводка на завтра\n"
         "• /evening — вечерняя сводка (новые оценки за сегодня + ДЗ и вложения)\n"
         "• /works (или /tests) — ближайшие контрольные и работы на 14 дней\n"
-        "• /grades (или /marks) — текущие оценки и средний балл\n"
+        "• /grades (или /marks) — оценки за сегодня и вчера\n"
         "• /avatar — минималистичная аватарка Bat"
     )
     await message.answer(text)

@@ -60,7 +60,7 @@ async def run() -> None:
                 BotCommand(command="tomorrow", description="📆 Сводка на завтра"),
                 BotCommand(command="evening", description="🌙 Вечерняя сводка (оценки за сегодня + ДЗ)"),
                 BotCommand(command="works", description="📝 Ближайшие контрольные и работы (14 дн.)"),
-                BotCommand(command="grades", description="🎯 Текущие оценки и средний балл"),
+                BotCommand(command="grades", description="🎯 Оценки за сегодня и вчера"),
                 BotCommand(command="avatar", description="🦇 Аватарка Bat"),
                 BotCommand(command="start", description="ℹ️ О боте и список команд"),
             ]

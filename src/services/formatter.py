@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional
 
 from src.models import (
@@ -199,34 +199,38 @@ def format_grades_summary(
     subjects: list[SubjectGrades],
     today: Optional[date] = None,
 ) -> str:
-    """Форматирует текущие оценки по предметам и средний балл."""
-    parts: list[str] = ["🎯 <b>Текущие оценки и средний балл</b>"]
+    """Форматирует оценки за сегодня и вчера (без простыни со средними баллами)."""
+    ref_day = today or date.today()
+    yesterday = ref_day - timedelta(days=1)
 
-    if today is not None:
-        today_items = [g for s in subjects for g in s.grades if g.grade_date == today]
-        if today_items:
-            today_block = "\n".join(_format_grade_line(g) for g in today_items)
-            parts.append(f"✨ <b>Сегодня ({today.strftime('%d.%m.%Y')}):</b>\n{today_block}")
+    all_grades = [g for s in subjects for g in s.grades]
+    today_items = [g for g in all_grades if g.grade_date == ref_day]
+    yesterday_items = [g for g in all_grades if g.grade_date == yesterday]
 
-    lines: list[str] = []
-    all_values: list[int] = []
-    for s in subjects:
-        if not s.grades:
-            continue
-        avg = s.average
-        vals = [g.value for g in s.grades]
-        all_values.extend(vals)
-        vals_str = ", ".join(str(v) for v in vals)
-        lines.append(
-            f"• <b>{escape_html(s.subject)}</b> — <b>{avg:.2f}</b> "
-            f"<code>({vals_str})</code>"
-        )
+    parts: list[str] = [
+        "🎯 <b>Оценки за сегодня и вчера</b>\n"
+        "<i>🔴 Итоговая (Summative) · 🟠 Текущая (Formative)</i>"
+    ]
 
-    if lines:
-        overall = sum(all_values) / len(all_values)
-        parts.append("\n".join(lines))
-        parts.append(f"📊 <b>Общий средний балл:</b> <b>{overall:.2f}</b> (всего оценок: {len(all_values)})")
+    if today_items:
+        today_block = "\n".join(_format_grade_line(g) for g in today_items)
     else:
-        parts.append("<i>Оценок пока не найдено.</i>")
+        today_block = "<i>Оценок пока нет.</i>"
+    parts.append(f"📅 <b>Сегодня ({_format_date_ru(ref_day)}):</b>\n{today_block}")
+
+    if yesterday_items:
+        yesterday_block = "\n".join(_format_grade_line(g) for g in yesterday_items)
+    else:
+        yesterday_block = "<i>Оценок не было.</i>"
+    parts.append(f"📅 <b>Вчера ({_format_date_ru(yesterday)}):</b>\n{yesterday_block}")
+
+    # Если и сегодня, и вчера пусто (например, после выходных), покажем 5 последних оценок
+    if not today_items and not yesterday_items and all_grades:
+        recent = sorted(all_grades, key=lambda g: g.grade_date, reverse=True)[:5]
+        recent_lines = [
+            f"<code>{g.grade_date.strftime('%d.%m')}</code> · {_format_grade_line(g)}"
+            for g in recent
+        ]
+        parts.append("🕒 <b>Последние выставленные оценки:</b>\n" + "\n".join(recent_lines))
 
     return "\n\n".join(parts)
