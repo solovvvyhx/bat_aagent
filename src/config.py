@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     timezone: str = "Europe/Moscow"
     morning_time: str = "07:30"
-    evening_offset_minutes: int = 20
+    evening_offset_minutes: int = 10
 
     port: int = 8080
     render_external_url: str = ""

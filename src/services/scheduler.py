@@ -4,6 +4,8 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
+from typing import Any, Optional
+
 import httpx
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -28,6 +30,29 @@ class BatScheduler:
         self._mes = mes_client
         self._settings = settings
         self._scheduler = AsyncIOScheduler(timezone=settings.tz)
+        self._started_at: datetime = datetime.now(settings.tz)
+        self._self_ping_count: int = 0
+        self._last_self_ping_at: Optional[str] = None
+        self._last_morning_sent_at: Optional[str] = None
+        self._next_evening_at: Optional[str] = None
+        self._last_evening_sent_at: Optional[str] = None
+        self._last_error: Optional[str] = None
+
+    def get_status(self) -> dict[str, Any]:
+        """Возвращает телеметрию планировщика для /health."""
+        now = datetime.now(self._settings.tz)
+        return {
+            "started_at": self._started_at.isoformat(timespec="seconds"),
+            "uptime_seconds": int((now - self._started_at).total_seconds()),
+            "morning_time": self._settings.morning_time,
+            "evening_offset_minutes": self._settings.evening_offset_minutes,
+            "self_ping_count": self._self_ping_count,
+            "last_self_ping_at": self._last_self_ping_at,
+            "last_morning_sent_at": self._last_morning_sent_at,
+            "next_evening_at": self._next_evening_at,
+            "last_evening_sent_at": self._last_evening_sent_at,
+            "last_error": self._last_error,
+        }
 
     def start(self) -> None:
         """Запускает планировщик и регистрирует задачи."""
@@ -69,8 +94,11 @@ class BatScheduler:
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
                 resp = await client.get(url)
+                self._self_ping_count += 1
+                self._last_self_ping_at = datetime.now(self._settings.tz).isoformat(timespec="seconds")
                 logger.info("Self-keepalive ping %s -> %s", url, resp.status_code)
         except Exception as exc:
+            self._last_error = f"self_ping: {exc}"
             logger.warning("Self-keepalive ping failed (%s): %s", url, exc)
 
     def stop(self) -> None:
@@ -89,8 +117,10 @@ class BatScheduler:
 
             text = format_morning_digest(schedule, homeworks, works=works)
             await self._send_long_message(text)
+            self._last_morning_sent_at = datetime.now(self._settings.tz).isoformat(timespec="seconds")
             await self._schedule_evening_for_day(schedule.target_date, schedule.last_lesson_end)
-        except Exception:
+        except Exception as exc:
+            self._last_error = f"morning: {exc}"
             logger.exception("Ошибка при отправке утренней сводки")
 
     async def schedule_today_evening(self) -> None:
@@ -120,6 +150,7 @@ class BatScheduler:
             id=f"evening_digest_{day.isoformat()}",
             replace_existing=True,
         )
+        self._next_evening_at = run_at.isoformat(timespec="seconds")
         logger.info("Вечерняя сводка запланирована на %s", run_at.strftime("%Y-%m-%d %H:%M"))
 
     async def send_evening_digest(self) -> None:
@@ -138,7 +169,9 @@ class BatScheduler:
                 today_grades=today_grades,
             )
             await self._send_long_message(text)
-        except Exception:
+            self._last_evening_sent_at = datetime.now(self._settings.tz).isoformat(timespec="seconds")
+        except Exception as exc:
+            self._last_error = f"evening: {exc}"
             logger.exception("Ошибка при отправке вечерней сводки")
 
     async def find_next_school_date(self, from_date: date) -> date:

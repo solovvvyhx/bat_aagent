@@ -47,7 +47,10 @@ async def run() -> None:
     dp["mes_client"] = mes_client
     dp["scheduler"] = scheduler
 
-    health_runner = await start_health_server(settings.port)
+    health_runner = await start_health_server(
+        settings.port,
+        status_provider=scheduler.get_status,
+    )
     scheduler.start()
 
     try:
