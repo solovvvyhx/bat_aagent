@@ -31,10 +31,21 @@ class Settings(BaseSettings):
     evening_offset_minutes: int = 20
 
     port: int = 8080
+    render_external_url: str = ""
+    keepalive_url: str = ""
+    keepalive_interval_minutes: int = 5
 
     # Задел под Этап 4 (мульти-юзер)
     encryption_key: str = ""
     database_url: str = "sqlite:///bat.db"
+
+    @property
+    def effective_keepalive_url(self) -> str:
+        """Возвращает внешний URL сервиса для self-ping (/health)."""
+        base = (self.keepalive_url or self.render_external_url).strip().rstrip("/")
+        if not base:
+            return ""
+        return base if base.endswith("/health") else f"{base}/health"
 
     @property
     def tz(self) -> ZoneInfo:

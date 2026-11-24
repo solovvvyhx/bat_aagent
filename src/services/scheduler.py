@@ -4,10 +4,12 @@ import asyncio
 import logging
 from datetime import date, datetime, timedelta
 
+import httpx
 from aiogram import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.config import Settings
 from src.services.formatter import format_evening_digest, format_morning_digest
@@ -43,8 +45,33 @@ class BatScheduler:
             id="init_evening_schedule",
             replace_existing=True,
         )
+        # Self-ping внешнего URL (/health) каждые N минут, чтобы Render Free не усыплял сервис
+        if self._settings.effective_keepalive_url:
+            self._scheduler.add_job(
+                self._self_ping,
+                trigger=IntervalTrigger(minutes=self._settings.keepalive_interval_minutes),
+                id="self_keepalive_ping",
+                replace_existing=True,
+            )
+            logger.info(
+                "Self-keepalive включён: %s каждые %s мин",
+                self._settings.effective_keepalive_url,
+                self._settings.keepalive_interval_minutes,
+            )
         self._scheduler.start()
         logger.info("Планировщик запущен (утро в %s %s)", self._settings.morning_time, self._settings.timezone)
+
+    async def _self_ping(self) -> None:
+        """Пингует внешний /health endpoint, чтобы сбрасывать таймер сна Render."""
+        url = self._settings.effective_keepalive_url
+        if not url:
+            return
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.get(url)
+                logger.info("Self-keepalive ping %s -> %s", url, resp.status_code)
+        except Exception as exc:
+            logger.warning("Self-keepalive ping failed (%s): %s", url, exc)
 
     def stop(self) -> None:
         """Останавливает планировщик."""

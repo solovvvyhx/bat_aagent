@@ -22,3 +22,7 @@ services:
         value: "07:30"
       - key: EVENING_OFFSET_MINUTES
         value: "20"
+      - key: KEEPALIVE_URL
+        value: https://bat-assistant-pq4i.onrender.com/health
+      - key: KEEPALIVE_INTERVAL_MINUTES
+        value: "5"
