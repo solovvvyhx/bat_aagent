@@ -1,3 +1,4 @@
+from .database import UserRepository
 from .formatter import (
     format_evening_digest,
     format_grades_summary,
@@ -7,12 +8,15 @@ from .formatter import (
 )
 from .health import start_health_server
 from .mes_client import MesAuthError, MesClient
+from .mes_pool import MesClientPool
 from .scheduler import BatScheduler
 
 __all__ = [
     "BatScheduler",
     "MesAuthError",
     "MesClient",
+    "MesClientPool",
+    "UserRepository",
     "format_evening_digest",
     "format_grades_summary",
     "format_morning_digest",

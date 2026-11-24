@@ -54,6 +54,7 @@ class MesClient:
         self._timeout = timeout
         self._auth_lock = asyncio.Lock()
         self._is_authenticated = False
+        self._student_name: Optional[str] = None
 
         # IPv4 transport: edu.mes.ru может зависать на IPv6 handshake
         transport = httpx.AsyncHTTPTransport(local_address="0.0.0.0", retries=2)
@@ -114,7 +115,31 @@ class MesClient:
             raise MesAuthError("Неверный логин или пароль от edu.mes.ru")
 
         self._is_authenticated = True
+        self._student_name = self._extract_student_name(post_resp.text)
         logger.info("Успешный вход на edu.mes.ru (%s)", post_resp.url)
+
+    @property
+    def student_name(self) -> Optional[str]:
+        """ФИО студента, извлечённое после авторизации."""
+        return self._student_name
+
+    @property
+    def login(self) -> str:
+        """Текущий логин клиента."""
+        return self._login
+
+    @property
+    def password(self) -> str:
+        """Текущий пароль клиента."""
+        return self._password
+
+    @staticmethod
+    def _extract_student_name(html: str) -> Optional[str]:
+        m = re.search(r"Выход\s*\(([^()—–-]+)", html)
+        if not m:
+            return None
+        name = re.sub(r"\s+", " ", m.group(1)).strip()
+        return name or None
 
     async def _get_authenticated(self, path: str) -> httpx.Response:
         """GET-запрос с автоматическим повторным логином при протухшей сессии."""

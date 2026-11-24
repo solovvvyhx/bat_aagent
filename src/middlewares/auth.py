@@ -3,18 +3,18 @@ from __future__ import annotations
 from typing import Any, Awaitable, Callable, Dict
 
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import TelegramObject
+
+from src.services.database import UserRepository
+from src.services.mes_pool import MesClientPool
 
 
-class AdminOnlyMiddleware(BaseMiddleware):
-    """Ограничивает доступ к боту только владельцем на Этапах 1–3.
+class UserContextMiddleware(BaseMiddleware):
+    """Подгружает текущего пользователя из БД и его MesClient в контекст хендлера."""
 
-    На Этапе 4 этот middleware будет заменён на UserContextMiddleware,
-    подгружающий пользователя из БД.
-    """
-
-    def __init__(self, admin_id: int) -> None:
-        self._admin_id = admin_id
+    def __init__(self, user_repo: UserRepository, mes_pool: MesClientPool) -> None:
+        self._user_repo = user_repo
+        self._mes_pool = mes_pool
 
     async def __call__(
         self,
@@ -22,9 +22,15 @@ class AdminOnlyMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        user = data.get("event_from_user")
-        if user is None or user.id != self._admin_id:
-            if isinstance(event, Message):
-                await event.answer("🦇 Доступ пока открыт только владельцу бота.")
-            return None
+        tg_user = data.get("event_from_user")
+        current_user = None
+        mes_client = None
+
+        if tg_user is not None:
+            current_user = await self._user_repo.get_user(tg_user.id)
+            if current_user is not None:
+                mes_client = await self._mes_pool.get_client(current_user)
+
+        data["current_user"] = current_user
+        data["mes_client"] = mes_client
         return await handler(event, data)

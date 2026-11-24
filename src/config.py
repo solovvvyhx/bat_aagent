@@ -22,8 +22,8 @@ class Settings(BaseSettings):
     bot_token: str
     admin_id: int = 5267340908
 
-    mes_login: str
-    mes_password: str
+    mes_login: str = ""
+    mes_password: str = ""
     mes_base_url: str = "https://edu.mes.ru"
 
     timezone: str = "Europe/Moscow"
@@ -35,9 +35,22 @@ class Settings(BaseSettings):
     keepalive_url: str = ""
     keepalive_interval_minutes: int = 5
 
-    # Задел под Этап 4 (мульти-юзер)
+    # База данных и шифрование (Этап 4: мульти-юзер)
     encryption_key: str = ""
     database_url: str = "sqlite:///bat.db"
+    max_concurrent_users: int = 5
+
+    @property
+    def async_database_url(self) -> str:
+        """Нормализует DATABASE_URL для асинхронного SQLAlchemy (SQLite / PostgreSQL)."""
+        url = self.database_url.strip()
+        if url.startswith("postgres://"):
+            return "postgresql+asyncpg://" + url[len("postgres://") :]
+        if url.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + url[len("postgresql://") :]
+        if url.startswith("sqlite:///") and "+aiosqlite" not in url:
+            return "sqlite+aiosqlite:///" + url[len("sqlite:///") :]
+        return url
 
     @property
     def effective_keepalive_url(self) -> str:

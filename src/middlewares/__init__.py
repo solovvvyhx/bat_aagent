@@ -1,3 +1,3 @@
-from .auth import AdminOnlyMiddleware
+from .auth import UserContextMiddleware
 
-__all__ = ["AdminOnlyMiddleware"]
+__all__ = ["UserContextMiddleware"]
