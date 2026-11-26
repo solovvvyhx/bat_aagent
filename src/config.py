@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         """Нормализует DATABASE_URL для асинхронного SQLAlchemy (SQLite / PostgreSQL)."""
         url = self.database_url.strip()
+        # Если случайно скопировали целиком команду `psql 'postgresql://...'` из Neon
+        if url.startswith("psql "):
+            url = url[len("psql ") :].strip()
+        url = url.strip("'\"")
         if url.startswith("postgres://"):
             return "postgresql+asyncpg://" + url[len("postgres://") :]
         if url.startswith("postgresql://"):
