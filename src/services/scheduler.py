@@ -245,7 +245,7 @@ class BatScheduler:
             await self._bot.send_message(
                 chat_id=telegram_id,
                 text=(
-                    "⚠️ Не удалось войти в <code>edu.mes.ru</code> (возможно, изменился пароль).\n"
+                    "◆ Сессия <code>edu.mes.ru</code> отклонена — возможно, сменился пароль.\n"
                     "Обнови данные командой /login."
                 ),
             )

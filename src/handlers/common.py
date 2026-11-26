@@ -16,11 +16,11 @@ router = Router(name="common")
 async def cmd_avatar(message: Message, settings: Settings) -> None:
     """Отправляет сгенерированную аватарку Bat."""
     if not settings.avatar_path.exists():
-        await message.answer("⚠️ Файл аватарки не найден.")
+        await message.answer("◆ Файл аватарки не найден.")
         return
 
     photo = FSInputFile(settings.avatar_path)
-    await message.answer_photo(photo=photo, caption="🦇 Bat — минималистичная аватарка")
+    await message.answer_photo(photo=photo, caption="<b>BAT</b> · аватар")
 
 
 @router.message(Command("stats"))
@@ -38,12 +38,12 @@ async def cmd_stats(
     status = scheduler.get_status()
     uptime_min = status["uptime_seconds"] // 60
     text = (
-        "📊 <b>Статистика Bat</b>\n\n"
-        f"• Подключённых учеников: <b>{count}</b>\n"
-        f"• Аптайм: <b>{uptime_min} мин</b> (с <code>{status['started_at']}</code>)\n"
-        f"• Self-ping: <b>{status['self_ping_count']}</b> (последний: <code>{status['last_self_ping_at']}</code>)\n"
-        f"• Утренняя сводка: <code>{status['morning_time']}</code> (последняя: <code>{status['last_morning_sent_at']}</code>)\n"
-        f"• Вечерняя сводка (+{status['evening_offset_minutes']} мин): след. <code>{status['next_evening_at']}</code>\n"
-        f"• Последняя ошибка: <code>{status['last_error']}</code>"
+        "<b>BAT</b> · Телеметрия системы\n\n"
+        f"▪ Пользователей: <b>{count}</b>\n"
+        f"▪ Аптайм: <b>{uptime_min} мин</b> <i>(с {status['started_at']})</i>\n"
+        f"▪ Self-ping: <b>{status['self_ping_count']}</b> <i>(последний: {status['last_self_ping_at']})</i>\n"
+        f"▪ Утро: <code>{status['morning_time']}</code> <i>(отправлено: {status['last_morning_sent_at']})</i>\n"
+        f"▪ Вечер (+{status['evening_offset_minutes']} мин): <code>{status['next_evening_at']}</code>\n"
+        f"▪ Ошибка: <code>{status['last_error']}</code>"
     )
     await message.answer(text)

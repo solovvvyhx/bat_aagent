@@ -30,17 +30,17 @@ class AuthStates(StatesGroup):
 def _help_text(user: User) -> str:
     greeting = f", <b>{escape_html(user.full_name)}</b>" if user.full_name else ""
     return (
-        f"🦇 <b>Bat</b> на связи{greeting}.\n\n"
-        f"Аккаунт <code>edu.mes.ru</code>: <code>{escape_html(user.mes_login)}</code>\n\n"
-        "<b>Команды:</b>\n"
-        "• /morning — сводка на сегодня (расписание, работы, ДЗ)\n"
-        "• /tomorrow — сводка на завтра\n"
-        "• /evening — вечерняя сводка (оценки за сегодня + ДЗ и вложения)\n"
-        "• /works (или /tests) — ближайшие контрольные и работы (14 дн.)\n"
-        "• /grades (или /marks) — оценки за сегодня и вчера\n"
-        "• /avatar — минималистичная аватарка Bat\n"
-        "• /login — сменить аккаунт edu.mes.ru\n"
-        "• /logout — отключить аккаунт и рассылки"
+        f"<b>BAT</b> на связи{greeting}.\n"
+        f"<i>Профиль: <code>{escape_html(user.mes_login)}</code> · система активна</i>\n\n"
+        "▸ <b>Команды</b>\n"
+        "▪ /morning — сводка на сегодня\n"
+        "▪ /tomorrow — сводка на завтра\n"
+        "▪ /evening — оценки за сегодня и ДЗ\n"
+        "▪ /works — контрольные и работы (14 дн.)\n"
+        "▪ /grades — оценки за сегодня и вчера\n"
+        "▪ /avatar — аватарка Bat\n"
+        "▪ /login — сменить аккаунт\n"
+        "▪ /logout — отключить аккаунт и сводки"
     )
 
 
@@ -49,10 +49,10 @@ async def cmd_cancel(message: Message, state: FSMContext) -> None:
     """Отменяет текущий шаг авторизации."""
     current = await state.get_state()
     if current is None:
-        await message.answer("Сейчас нечего отменять.")
+        await message.answer("▪ Сейчас отменять нечего.")
         return
     await state.clear()
-    await message.answer("❌ Ввод отменён.")
+    await message.answer("▪ Ввод отменён.")
 
 
 @router.message(Command("start"))
@@ -69,9 +69,10 @@ async def cmd_start(
 
     await state.set_state(AuthStates.waiting_login)
     await message.answer(
-        "🦇 Привет! Я <b>Bat</b> — автономный ассистент для <code>edu.mes.ru</code>.\n\n"
-        "Чтобы подключить твоё расписание, ДЗ, работы и оценки, введи свой <b>логин от edu.mes.ru</b>:\n"
-        "<i>(Пароль шифруется, а сообщение с ним сразу удаляется из чата. Для отмены — /cancel.)</i>"
+        "<b>BAT</b> · Автономный учебный ассистент.\n\n"
+        "Пришли свой <b>логин от <code>edu.mes.ru</code></b>, чтобы я подключил "
+        "расписание, задания, контрольные и оценки.\n"
+        "<i>Пароль шифруется, а сообщение с ним сразу удаляется из чата. Отмена — /cancel.</i>"
     )
 
 
@@ -81,8 +82,8 @@ async def cmd_login(message: Message, state: FSMContext) -> None:
     await state.clear()
     await state.set_state(AuthStates.waiting_login)
     await message.answer(
-        "🔐 Введи свой <b>логин от edu.mes.ru</b>:\n"
-        "<i>(Для отмены — /cancel)</i>"
+        "▸ <b>Подключение аккаунта</b>\n"
+        "Пришли логин от <code>edu.mes.ru</code> <i>(отмена — /cancel)</i>."
     )
 
 
@@ -90,15 +91,14 @@ async def cmd_login(message: Message, state: FSMContext) -> None:
 async def process_login(message: Message, state: FSMContext) -> None:
     login = (message.text or "").strip()
     if not login or login.startswith("/"):
-        await message.answer("⚠️ Введи обычный логин от <code>edu.mes.ru</code> (или /cancel).")
+        await message.answer("▪ Нужен обычный логин от <code>edu.mes.ru</code> (или /cancel).")
         return
 
     await state.update_data(mes_login=login)
     await state.set_state(AuthStates.waiting_password)
     await message.answer(
-        f"Логин <code>{escape_html(login)}</code> принят.\n"
-        "Теперь введи <b>пароль от edu.mes.ru</b> "
-        "<i>(я сразу удалю твоё сообщение с паролем из чата)</i>:"
+        f"▪ Логин <code>{escape_html(login)}</code> принят.\n"
+        "Теперь введи <b>пароль</b> — я сразу удалю твоё сообщение из чата."
     )
 
 
@@ -112,39 +112,38 @@ async def process_password(
     settings: Settings,
 ) -> None:
     password = (message.text or "").strip()
-    # Удаляем сообщение с паролем из истории чата для безопасности
     try:
         await message.delete()
     except Exception:
         pass
 
     if not password:
-        await message.answer("⚠️ Пароль пустой. Введи пароль ещё раз или /cancel.")
+        await message.answer("▪ Пароль пустой. Пришли его ещё раз или нажми /cancel.")
         return
 
     data = await state.get_data()
     login = str(data.get("mes_login") or "").strip()
     if not login:
         await state.clear()
-        await message.answer("⚠️ Сессия ввода сброшена. Начни заново с /login.")
+        await message.answer("▪ Сессия ввода сброшена. Начни заново с /login.")
         return
 
-    status_msg = await message.answer("🦇 Проверяю вход на <code>edu.mes.ru</code>...")
+    status_msg = await message.answer("▪ Проверяю доступ к <code>edu.mes.ru</code>…")
     try:
         full_name = await mes_pool.verify_credentials(login=login, password=password)
     except MesAuthError:
         await state.set_state(AuthStates.waiting_login)
         await status_msg.edit_text(
-            "❌ Неверный логин или пароль от <code>edu.mes.ru</code>.\n"
-            "Введи <b>логин</b> ещё раз (или /cancel):"
+            "◆ <code>edu.mes.ru</code> отклонил вход — проверь логин и пароль.\n"
+            "Пришли <b>логин</b> ещё раз (или /cancel)."
         )
         return
     except Exception as exc:
         logger.exception("Ошибка при проверке входа на edu.mes.ru")
         await state.clear()
         await status_msg.edit_text(
-            f"⚠️ Не удалось подключиться к <code>edu.mes.ru</code>: <code>{escape_html(str(exc))}</code>\n"
-            "Попробуй ещё раз чуть позже командой /login."
+            f"◆ Нет ответа от <code>edu.mes.ru</code>: <code>{escape_html(str(exc))}</code>\n"
+            "Попробуй чуть позже командой /login."
         )
         return
 
@@ -168,7 +167,7 @@ async def process_password(
     await state.clear()
 
     await status_msg.edit_text(
-        "✅ <b>Аккаунт подключён!</b> Пароль сохранён в зашифрованном виде.\n\n"
+        "▸ <b>Доступ подтверждён.</b> Пароль зашифрован.\n\n"
         + _help_text(user)
     )
 
@@ -185,7 +184,7 @@ async def cmd_logout(
     """Удаляет аккаунт пользователя из БД и отключает уведомления."""
     await state.clear()
     if current_user is None or message.from_user is None:
-        await message.answer("Ты ещё не подключил аккаунт. Используй /login.")
+        await message.answer("▪ Аккаунт ещё не подключён. Используй /login.")
         return
 
     tg_id = message.from_user.id
@@ -195,6 +194,6 @@ async def cmd_logout(
     await scheduler.refresh_users_count()
 
     await message.answer(
-        "👋 Аккаунт <code>edu.mes.ru</code> удалён, рассылки отключены.\n"
-        "Если захочешь вернуться — просто нажми /start или /login."
+        "▪ Данные удалены, автоматические сводки отключены.\n"
+        "<i>Если решишь вернуться — /start или /login.</i>"
     )

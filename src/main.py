@@ -89,15 +89,15 @@ async def run() -> None:
     try:
         await bot.set_my_commands(
             [
-                BotCommand(command="morning", description="🌅 Сводка на сегодня (расписание, работы, ДЗ)"),
-                BotCommand(command="tomorrow", description="📆 Сводка на завтра"),
-                BotCommand(command="evening", description="🌙 Вечерняя сводка (оценки за сегодня + ДЗ)"),
-                BotCommand(command="works", description="📝 Ближайшие контрольные и работы (14 дн.)"),
-                BotCommand(command="grades", description="🎯 Оценки за сегодня и вчера"),
-                BotCommand(command="login", description="🔐 Войти / сменить аккаунт edu.mes.ru"),
-                BotCommand(command="logout", description="👋 Отключить аккаунт и рассылки"),
-                BotCommand(command="avatar", description="🦇 Аватарка Bat"),
-                BotCommand(command="start", description="ℹ️ О боте и список команд"),
+                BotCommand(command="morning", description="▸ Сводка на сегодня"),
+                BotCommand(command="tomorrow", description="▸ Сводка на завтра"),
+                BotCommand(command="evening", description="▸ Вечерняя сводка и оценки"),
+                BotCommand(command="works", description="◆ Контрольные и работы (14 дн.)"),
+                BotCommand(command="grades", description="◇ Оценки за сегодня и вчера"),
+                BotCommand(command="login", description="▪ Войти / сменить аккаунт"),
+                BotCommand(command="logout", description="▪ Отключить аккаунт"),
+                BotCommand(command="avatar", description="▪ Аватарка Bat"),
+                BotCommand(command="start", description="▪ Справка и команды"),
             ]
         )
         await bot.delete_webhook(drop_pending_updates=True)

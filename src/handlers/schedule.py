@@ -23,7 +23,7 @@ from src.utils.text import escape_html, split_telegram_message
 router = Router(name="schedule")
 
 _AUTH_REQUIRED_TEXT = (
-    "🔐 Сначала подключи свой аккаунт <code>edu.mes.ru</code> командой /login (или /start)."
+    "▪ Доступ не настроен. Подключи аккаунт <code>edu.mes.ru</code> командой /login."
 )
 
 
@@ -35,11 +35,11 @@ async def _reply_long(message: Message, text: str) -> None:
 async def _handle_error(wait_msg: Message, exc: Exception) -> None:
     if isinstance(exc, MesAuthError):
         await wait_msg.edit_text(
-            "⚠️ Не удалось войти в <code>edu.mes.ru</code> (возможно, изменился пароль).\n"
+            "◆ Сессия <code>edu.mes.ru</code> отклонена — возможно, сменился пароль.\n"
             "Обнови данные командой /login."
         )
         return
-    await wait_msg.edit_text(f"⚠️ Не удалось получить данные: <code>{escape_html(str(exc))}</code>")
+    await wait_msg.edit_text(f"◆ Сбой загрузки: <code>{escape_html(str(exc))}</code>")
 
 
 @router.message(Command("morning"))
@@ -53,7 +53,7 @@ async def cmd_morning(
         await message.answer(_AUTH_REQUIRED_TEXT)
         return
 
-    wait_msg = await message.answer("🦇 Загружаю сводку на сегодня...")
+    wait_msg = await message.answer("▪ Секунду, собираю сводку на сегодня…")
     today = datetime.now(settings.tz).date()
     try:
         schedule, homeworks, works = await mes_client.fetch_morning_data(today)
@@ -61,7 +61,7 @@ async def cmd_morning(
             schedule,
             homeworks,
             works=works,
-            title="🌅 Сводка на сегодня",
+            title="Сводка на сегодня",
         )
         await wait_msg.delete()
         await _reply_long(message, text)
@@ -80,7 +80,7 @@ async def cmd_tomorrow(
         await message.answer(_AUTH_REQUIRED_TEXT)
         return
 
-    wait_msg = await message.answer("🦇 Загружаю данные на завтра...")
+    wait_msg = await message.answer("▪ Собираю сводку на завтра…")
     tomorrow = datetime.now(settings.tz).date() + timedelta(days=1)
     try:
         schedule, homeworks, works = await mes_client.fetch_morning_data(tomorrow)
@@ -88,7 +88,7 @@ async def cmd_tomorrow(
             schedule,
             homeworks,
             works=works,
-            title="📆 Сводка на завтра",
+            title="Сводка на завтра",
         )
         await wait_msg.delete()
         await _reply_long(message, text)
@@ -108,7 +108,7 @@ async def cmd_evening(
         await message.answer(_AUTH_REQUIRED_TEXT)
         return
 
-    wait_msg = await message.answer("🦇 Собираю оценки и ДЗ...")
+    wait_msg = await message.answer("▪ Проверяю оценки и задания…")
     today = datetime.now(settings.tz).date()
     try:
         target = await scheduler.find_next_school_date(mes_client, today)
@@ -139,7 +139,7 @@ async def cmd_works(
         await message.answer(_AUTH_REQUIRED_TEXT)
         return
 
-    wait_msg = await message.answer("🦇 Загружаю календарь работ...")
+    wait_msg = await message.answer("▪ Загружаю календарь работ…")
     today = datetime.now(settings.tz).date()
     try:
         works = await mes_client.fetch_works(from_date=today, days=14)
@@ -161,7 +161,7 @@ async def cmd_grades(
         await message.answer(_AUTH_REQUIRED_TEXT)
         return
 
-    wait_msg = await message.answer("🦇 Загружаю оценки...")
+    wait_msg = await message.answer("▪ Проверяю оценки…")
     today = datetime.now(settings.tz).date()
     try:
         subjects = await mes_client.fetch_grades()

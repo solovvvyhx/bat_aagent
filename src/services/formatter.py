@@ -80,7 +80,7 @@ def _format_date_ru(target_date: date) -> str:
 def _format_paired_lesson(item: PairedLesson) -> str:
     subj = escape_html(item.subject)
     prefix = f"Пара · {subj}" if item.is_pair else subj
-    line = f"• <b>{prefix}</b> · <code>{item.time_range}</code>"
+    line = f"<code>{item.time_range}</code> · <b>{prefix}</b>"
     if item.room:
         line += f" <i>(каб. {escape_html(item.room)})</i>"
     return line
@@ -88,12 +88,12 @@ def _format_paired_lesson(item: PairedLesson) -> str:
 
 def _format_homework_item(hw: HomeworkItem, include_attachments: bool = True) -> str:
     subj = escape_html(hw.subject)
-    body = format_expandable_quote(hw.text) if hw.text.strip() else "<i>Без текста</i>"
-    lines = [f"• <b>{subj}</b>\n{body}"]
+    body = format_expandable_quote(hw.text) if hw.text.strip() else "<i>Без описания</i>"
+    lines = [f"▪ <b>{subj}</b>\n{body}"]
 
     if include_attachments and hw.attachments:
         att_links = [
-            f'📎 <a href="{escape_html(att.url)}">{escape_html(att.name)}</a>'
+            f'↗ <a href="{escape_html(att.url)}">{escape_html(att.name)}</a>'
             for att in hw.attachments
         ]
         lines.append("\n".join(att_links))
@@ -102,47 +102,47 @@ def _format_homework_item(hw: HomeworkItem, include_attachments: bool = True) ->
 
 
 def _format_work_line(work: WorkItem) -> str:
-    icon = "🔴" if work.kind == "Summative" else "🟠"
-    kind_ru = "Итоговая" if work.kind == "Summative" else "Текущая"
+    marker = "◆" if work.kind == "Summative" else "◇"
+    kind_ru = "итоговая" if work.kind == "Summative" else "текущая"
     return (
-        f"{icon} <b>{escape_html(work.subject)}</b> "
+        f"{marker} <b>{escape_html(work.subject)}</b> "
         f"<i>({kind_ru})</i> — {escape_html(work.title)}"
     )
 
 
 def _format_grade_line(g: GradeItem) -> str:
-    icon = "🔴" if g.kind == "Summative" else "🟠"
+    marker = "◆" if g.kind == "Summative" else "◇"
     details_parts = [p for p in (g.title, g.work_type) if p]
     details = f" — <i>{escape_html(', '.join(details_parts))}</i>" if details_parts else ""
-    return f"{icon} <b>{escape_html(g.subject)}</b>: <b>{g.value}</b>{details}"
+    return f"{marker} <b>{escape_html(g.subject)}</b>: <b>{g.value}</b>{details}"
 
 
 def format_morning_digest(
     schedule: DaySchedule,
     homeworks: list[HomeworkItem],
     works: Optional[list[WorkItem]] = None,
-    title: str = "🌅 Утренняя сводка",
+    title: str = "Доброе утро",
 ) -> str:
-    """Форматирует утреннюю сводку: расписание (с парами) + работы на день + ДЗ."""
+    """Форматирует утреннюю сводку в минималистичном стиле Bat."""
     date_str = _format_date_ru(schedule.target_date)
-    parts: list[str] = [f"🦇 <b>{escape_html(title)}</b>\n<i>{date_str}</i>"]
+    parts: list[str] = [f"<b>BAT</b> · {escape_html(title)}\n<i>{date_str}</i>"]
 
     paired = merge_lessons_into_pairs(schedule.lessons)
     if paired:
         lessons_block = "\n".join(_format_paired_lesson(item) for item in paired)
-        parts.append(f"📅 <b>Расписание:</b>\n{lessons_block}")
+        parts.append(f"▸ <b>Расписание</b>\n{lessons_block}")
     else:
-        parts.append("📅 <b>Расписание:</b>\n<i>Уроков нет — можно выдохнуть.</i>")
+        parts.append("▸ <b>Расписание</b>\n<i>Уроков нет. Можно спокойно выдохнуть.</i>")
 
     if works:
         works_block = "\n".join(_format_work_line(w) for w in works)
-        parts.append(f"📝 <b>Контрольные и работы на день:</b>\n{works_block}")
+        parts.append(f"▸ <b>Работы на день</b>\n{works_block}")
 
     if homeworks:
         hw_block = "\n\n".join(_format_homework_item(hw, include_attachments=True) for hw in homeworks)
-        parts.append(f"📚 <b>Домашнее задание на день:</b>\n{hw_block}")
+        parts.append(f"▸ <b>Домашнее задание</b>\n{hw_block}")
     else:
-        parts.append("📚 <b>Домашнее задание на день:</b>\n<i>На этот день ДЗ не найдено.</i>")
+        parts.append("▸ <b>Домашнее задание</b>\n<i>Заданий на этот день нет.</i>")
 
     return "\n\n".join(parts)
 
@@ -153,20 +153,20 @@ def format_evening_digest(
     next_school_date: Optional[date] = None,
     today_grades: Optional[list[GradeItem]] = None,
 ) -> str:
-    """Форматирует вечернюю сводку: новые оценки за сегодня + ДЗ и вложения."""
+    """Форматирует вечернюю сводку: оценки за сегодня + ДЗ и вложения."""
     label_date = next_school_date or target_date
     date_str = _format_date_ru(label_date)
-    parts: list[str] = [f"🌙 <b>Вечерняя сводка</b>\n<i>ДЗ на {date_str}</i>"]
+    parts: list[str] = [f"<b>BAT</b> · Учебный день завершён\n<i>Задания на {date_str}</i>"]
 
     if today_grades:
         grades_block = "\n".join(_format_grade_line(g) for g in today_grades)
-        parts.append(f"🎯 <b>Новые оценки за сегодня:</b>\n{grades_block}")
+        parts.append(f"▸ <b>Новые оценки за сегодня</b>\n{grades_block}")
 
     if homeworks:
         hw_block = "\n\n".join(_format_homework_item(hw, include_attachments=True) for hw in homeworks)
-        parts.append(f"📚 <b>Домашние задания:</b>\n{hw_block}")
+        parts.append(f"▸ <b>Домашние задания</b>\n{hw_block}")
     else:
-        parts.append("📚 <b>Домашние задания:</b>\n<i>На этот день ДЗ пока нет.</i>")
+        parts.append("▸ <b>Домашние задания</b>\n<i>Пока ничего не задано.</i>")
 
     return "\n\n".join(parts)
 
@@ -174,9 +174,9 @@ def format_evening_digest(
 def format_works_digest(works: list[WorkItem], start_date: date, days: int = 14) -> str:
     """Форматирует список ближайших контрольных, суммативных и формативных работ."""
     header = (
-        f"📝 <b>Календарь работ</b>\n"
-        f"<i>Ближайшие {days} дн. (с {start_date.strftime('%d.%m.%Y')})</i>\n"
-        f"<i>🔴 Итоговая (Summative) · 🟠 Текущая (Formative)</i>"
+        f"<b>BAT</b> · Календарь работ\n"
+        f"<i>Ближайшие {days} дн. (с {start_date.strftime('%d.%m.%Y')}) · "
+        f"◆ итоговая · ◇ текущая</i>"
     )
     if not works:
         return f"{header}\n\n<i>На ближайшие {days} дней работ не запланировано.</i>"
@@ -187,7 +187,7 @@ def format_works_digest(works: list[WorkItem], start_date: date, days: int = 14)
 
     blocks: list[str] = [header]
     for day in sorted(grouped.keys()):
-        lines = [f"<b>📅 {_format_date_ru(day)}</b>"]
+        lines = [f"▸ <b>{_format_date_ru(day)}</b>"]
         for w in grouped[day]:
             lines.append(_format_work_line(w))
         blocks.append("\n".join(lines))
@@ -199,7 +199,7 @@ def format_grades_summary(
     subjects: list[SubjectGrades],
     today: Optional[date] = None,
 ) -> str:
-    """Форматирует оценки за сегодня и вчера (без простыни со средними баллами)."""
+    """Форматирует оценки за сегодня и вчера."""
     ref_day = today or date.today()
     yesterday = ref_day - timedelta(days=1)
 
@@ -208,29 +208,28 @@ def format_grades_summary(
     yesterday_items = [g for g in all_grades if g.grade_date == yesterday]
 
     parts: list[str] = [
-        "🎯 <b>Оценки за сегодня и вчера</b>\n"
-        "<i>🔴 Итоговая (Summative) · 🟠 Текущая (Formative)</i>"
+        "<b>BAT</b> · Оценки\n"
+        "<i>◆ итоговая · ◇ текущая</i>"
     ]
 
     if today_items:
         today_block = "\n".join(_format_grade_line(g) for g in today_items)
     else:
-        today_block = "<i>Оценок пока нет.</i>"
-    parts.append(f"📅 <b>Сегодня ({_format_date_ru(ref_day)}):</b>\n{today_block}")
+        today_block = "<i>Сегодня оценок пока нет.</i>"
+    parts.append(f"▸ <b>Сегодня · {_format_date_ru(ref_day)}</b>\n{today_block}")
 
     if yesterday_items:
         yesterday_block = "\n".join(_format_grade_line(g) for g in yesterday_items)
     else:
-        yesterday_block = "<i>Оценок не было.</i>"
-    parts.append(f"📅 <b>Вчера ({_format_date_ru(yesterday)}):</b>\n{yesterday_block}")
+        yesterday_block = "<i>Вчера оценок не было.</i>"
+    parts.append(f"▸ <b>Вчера · {_format_date_ru(yesterday)}</b>\n{yesterday_block}")
 
-    # Если и сегодня, и вчера пусто (например, после выходных), покажем 5 последних оценок
     if not today_items and not yesterday_items and all_grades:
         recent = sorted(all_grades, key=lambda g: g.grade_date, reverse=True)[:5]
         recent_lines = [
             f"<code>{g.grade_date.strftime('%d.%m')}</code> · {_format_grade_line(g)}"
             for g in recent
         ]
-        parts.append("🕒 <b>Последние выставленные оценки:</b>\n" + "\n".join(recent_lines))
+        parts.append("▸ <b>Последние выставленные</b>\n" + "\n".join(recent_lines))
 
     return "\n\n".join(parts)
