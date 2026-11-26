@@ -34,12 +34,26 @@ async def run() -> None:
         encryption_key=settings.encryption_key,
         fallback_secret=settings.bot_token,
     )
+    db_init_error: str | None = None
     user_repo = UserRepository(
         database_url=settings.async_database_url,
         cipher=cipher,
     )
-    await user_repo.init_db()
-    await user_repo.seed_admin_if_missing(settings)
+    try:
+        await user_repo.init_db()
+        await user_repo.seed_admin_if_missing(settings)
+    except Exception as exc:
+        db_init_error = f"db_init({type(exc).__name__}): {exc}"
+        logging.getLogger(__name__).exception(
+            "Не удалось подключиться к основной БД, переключаюсь на fallback SQLite"
+        )
+        await user_repo.close()
+        user_repo = UserRepository(
+            database_url="sqlite+aiosqlite:///bat_fallback.db",
+            cipher=cipher,
+        )
+        await user_repo.init_db()
+        await user_repo.seed_admin_if_missing(settings)
 
     mes_pool = MesClientPool(base_url=settings.mes_base_url)
 
@@ -57,6 +71,8 @@ async def run() -> None:
         mes_pool=mes_pool,
         settings=settings,
     )
+    if db_init_error:
+        scheduler._last_error = db_init_error
     await scheduler.refresh_users_count()
 
     dp["settings"] = settings
